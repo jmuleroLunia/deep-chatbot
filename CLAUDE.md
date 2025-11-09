@@ -30,7 +30,11 @@ deep-chatbot/
 │   ├── main.py          # FastAPI application
 │   ├── pyproject.toml   # Poetry dependencies
 │   └── README.md        # Backend documentation
-└── frontend/            # Frontend application (to be created)
+├── frontend/            # Frontend application (to be created)
+└── funcionalidades/     # Feature tracking system
+    ├── pendiente/       # Planned features (not started)
+    ├── activas/         # Features in active development
+    └── completadas/     # Completed features
 ```
 
 ## Development Commands
@@ -57,6 +61,76 @@ Backend runs on `http://127.0.0.1:8000` by default.
 ```bash
 cd frontend
 # Commands will be added when frontend is created
+```
+
+## Development Workflow
+
+### Feature Development Process
+
+**IMPORTANT**: Before implementing ANY new functionality, follow this workflow:
+
+#### 1. Planning Phase (Pendiente)
+
+Create a markdown file in `funcionalidades/pendiente/` with:
+- **Filename**: `[feature-name].md` (descriptive, kebab-case)
+- **Content structure**:
+  ```markdown
+  # [Feature Name]
+
+  ## Description
+  Brief description of the feature
+
+  ## Tasks
+  Break down into testable blocks (usually front + back together):
+
+  ### Task 1: [Name]
+  - [ ] Backend: API endpoint/logic
+  - [ ] Frontend: UI component/integration
+  - [ ] Testing: How to verify it works
+
+  ### Task 2: [Name]
+  - [ ] Backend: ...
+  - [ ] Frontend: ...
+  - [ ] Testing: ...
+
+  ## Acceptance Criteria
+  - Feature works end-to-end
+  - All tests pass
+  - Code is documented
+  ```
+
+#### 2. Active Development (Activas)
+
+When starting work on a feature:
+1. Move the markdown file from `funcionalidades/pendiente/` to `funcionalidades/activas/`
+2. Update the file as you complete tasks (check off items)
+3. Work on tasks in testable blocks (complete backend + frontend + testing together)
+
+#### 3. Completion (Completadas)
+
+When the feature is fully implemented and tested:
+1. Move the markdown file from `funcionalidades/activas/` to `funcionalidades/completadas/`
+2. Ensure all checkboxes are marked
+3. Add completion date at the top of the file
+
+### Key Principles
+
+- **Testable Blocks**: Always break features into tasks that combine frontend and backend work
+- **Incremental Progress**: Each task should be independently testable
+- **Clear Documentation**: Keep the markdown file updated as you progress
+- **One Active Feature**: Focus on completing active features before starting new ones
+
+### Example Workflow
+
+```bash
+# 1. Create feature plan
+# Created: funcionalidades/pendiente/user-authentication.md
+
+# 2. Start development
+mv funcionalidades/pendiente/user-authentication.md funcionalidades/activas/
+
+# 3. Complete the feature
+mv funcionalidades/activas/user-authentication.md funcionalidades/completadas/
 ```
 
 ## Architecture

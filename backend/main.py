@@ -101,6 +101,12 @@ async def chat(request: ChatRequest):
         raise HTTPException(status_code=500, detail=f"Error processing request: {str(e)}")
 
 
+@app.options("/chat/stream")
+async def chat_stream_options():
+    """Handle CORS preflight for streaming endpoint."""
+    return {"message": "OK"}
+
+
 @app.post("/chat/stream")
 async def chat_stream(request: ChatRequest):
     """
@@ -123,11 +129,12 @@ async def chat_stream(request: ChatRequest):
                 if event["event"] == "on_chat_model_stream":
                     chunk = event["data"]["chunk"]
                     if hasattr(chunk, "content") and chunk.content:
-                        yield f"data: {json.dumps({'type': 'content', 'data': chunk.content})}\n\n"
+                        yield f"data: {json.dumps({'type': 'token', 'content': chunk.content})}\n\n"
 
                 elif event["event"] == "on_tool_start":
                     tool_name = event["name"]
-                    yield f"data: {json.dumps({'type': 'tool_start', 'tool': tool_name})}\n\n"
+                    tool_input = event.get("data", {}).get("input", {})
+                    yield f"data: {json.dumps({'type': 'tool_call', 'name': tool_name, 'args': tool_input})}\n\n"
 
                 elif event["event"] == "on_tool_end":
                     tool_name = event["name"]
