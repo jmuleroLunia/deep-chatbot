@@ -2,7 +2,7 @@
 from langchain_ollama import ChatOllama
 from langgraph.prebuilt import create_react_agent
 from langgraph.graph import StateGraph, MessagesState, START
-from langgraph.checkpoint.memory import MemorySaver
+from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 from agents.config import OLLAMA_BASE_URL, OLLAMA_MODEL
 
 # Import all tools
@@ -123,12 +123,37 @@ Remember: You are a deep agent. Think deeply, plan carefully, and execute system
 """
 
 
-def create_deep_agent():
+# Global checkpointer instance (initialized lazily)
+_checkpointer_instance = None
+
+
+async def get_checkpointer():
+    """Get or create the async SQLite checkpointer."""
+    global _checkpointer_instance
+    if _checkpointer_instance is None:
+        # Create checkpointer and set it up
+        async with AsyncSqliteSaver.from_conn_string("./workspace/checkpoints.db") as checkpointer:
+            # Setup the database tables
+            # The checkpointer is already initialized when exiting the context manager
+            # So we need to create a new one that persists
+            pass
+        # Now create a persistent instance (not in context manager)
+        import aiosqlite
+        conn = await aiosqlite.connect("./workspace/checkpoints.db")
+        from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver as Saver
+        _checkpointer_instance = Saver(conn)
+    return _checkpointer_instance
+
+
+def create_deep_agent(checkpointer=None):
     """
     Create the main deep agent with all capabilities.
 
+    Args:
+        checkpointer: Optional checkpointer instance. If not provided, agent will be created without persistence.
+
     Returns:
-        A compiled LangGraph agent with memory and all tools
+        A compiled LangGraph agent
     """
     # Initialize Ollama model
     model = ChatOllama(
@@ -164,12 +189,12 @@ def create_deep_agent():
         from langchain_core.messages import SystemMessage
         return [SystemMessage(content=DEEP_AGENT_PROMPT)] + state["messages"]
 
-    # Create the agent with memory
+    # Create the agent with optional SQLite persistence
     agent = create_react_agent(
         model,
         tools=all_tools,
         prompt=agent_prompt,
-        checkpointer=MemorySaver(),
+        checkpointer=checkpointer,
     )
 
     return agent

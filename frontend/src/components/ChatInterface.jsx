@@ -4,23 +4,58 @@ import MessageList from './MessageList'
 import MessageInput from './MessageInput'
 import PlanViewer from './PlanViewer'
 import NotesViewer from './NotesViewer'
+import { getThread } from '../utils/api'
 
 const API_BASE_URL = 'http://127.0.0.1:8000'
 
-function ChatInterface() {
+function ChatInterface({ threadId, shouldLoadMessages, onMessagesLoaded }) {
   const [messages, setMessages] = useState([])
   const [isLoading, setIsLoading] = useState(false)
-  const [threadId, setThreadId] = useState('default-thread')
   const [showPlan, setShowPlan] = useState(false)
   const [showNotes, setShowNotes] = useState(false)
   const [plan, setPlan] = useState(null)
   const [notes, setNotes] = useState([])
 
+  // Load messages from thread when switching threads
+  useEffect(() => {
+    if (shouldLoadMessages && threadId) {
+      loadThreadMessages()
+    }
+  }, [shouldLoadMessages, threadId])
+
+  // Clear messages when thread changes
+  useEffect(() => {
+    if (threadId) {
+      setMessages([])
+      loadThreadMessages()
+    }
+  }, [threadId])
+
+  // Load thread messages from backend
+  const loadThreadMessages = async () => {
+    try {
+      const threadData = await getThread(threadId)
+      // Convert backend message format to frontend format
+      const formattedMessages = threadData.messages.map(msg => ({
+        role: msg.role,
+        content: msg.content,
+        timestamp: msg.timestamp,
+        tool_calls: msg.tool_calls || []
+      }))
+      setMessages(formattedMessages)
+      if (onMessagesLoaded) {
+        onMessagesLoaded()
+      }
+    } catch (error) {
+      console.error('Error loading thread messages:', error)
+      setMessages([])
+    }
+  }
+
   // Fetch plan
   const fetchPlan = async () => {
     try {
       const response = await axios.get(`${API_BASE_URL}/plan`)
-      // Backend returns the plan directly, not nested in a 'plan' field
       setPlan(response.data)
     } catch (error) {
       console.error('Error fetching plan:', error)

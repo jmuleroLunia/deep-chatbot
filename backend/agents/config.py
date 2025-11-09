@@ -18,7 +18,7 @@ class AgentState(MessagesState):
 
 # Ollama configuration
 OLLAMA_BASE_URL = "http://localhost:11434"
-OLLAMA_MODEL = "llama3.2"  # You can change this to any model you have installed
+OLLAMA_MODEL = "gpt-oss:120b-cloud"  # You can change this to any model you have installed
 
 # Agent names
 SUPERVISOR_NAME = "supervisor"
