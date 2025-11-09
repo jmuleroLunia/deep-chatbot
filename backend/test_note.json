@@ -1,0 +1,6 @@
+{
+  "thread_id": "test-123",
+  "title": "Authentication Implementation Notes",
+  "content": "Use bcrypt for password hashing. JWT tokens should expire after 24 hours. Store refresh tokens in HTTP-only cookies.",
+  "tags": ["authentication", "security", "jwt"]
+}

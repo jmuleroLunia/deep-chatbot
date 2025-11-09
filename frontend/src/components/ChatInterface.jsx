@@ -71,9 +71,7 @@ function ChatInterface({ threadId, shouldLoadMessages, onMessagesLoaded }) {
       return
     }
     try {
-      const response = await axios.get(`${API_BASE_URL}/plan`, {
-        params: { thread_id: threadId }
-      })
+      const response = await axios.get(`${API_BASE_URL}/api/v1/plans/active/${threadId}`)
       setPlan(response.data)
     } catch (error) {
       console.error('Error fetching plan:', error)
@@ -88,7 +86,7 @@ function ChatInterface({ threadId, shouldLoadMessages, onMessagesLoaded }) {
       return
     }
     try {
-      const response = await axios.get(`${API_BASE_URL}/notes`, {
+      const response = await axios.get(`${API_BASE_URL}/api/v1/memory/notes`, {
         params: { thread_id: threadId }
       })
       setNotes(response.data.notes || [])
@@ -111,7 +109,7 @@ function ChatInterface({ threadId, shouldLoadMessages, onMessagesLoaded }) {
 
     try {
       // Use streaming endpoint
-      const response = await fetch(`${API_BASE_URL}/chat/stream`, {
+      const response = await fetch(`${API_BASE_URL}/api/v1/conversations/stream`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -139,38 +137,14 @@ function ChatInterface({ threadId, shouldLoadMessages, onMessagesLoaded }) {
         if (done) break
 
         const chunk = decoder.decode(value)
-        const lines = chunk.split('\n')
 
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            const data = line.slice(6)
-            if (data === '[DONE]') continue
-
-            try {
-              const parsed = JSON.parse(data)
-
-              if (parsed.type === 'token') {
-                // Update assistant message content
-                assistantMessage.content += parsed.content
-                setMessages(prev => {
-                  const newMessages = [...prev]
-                  newMessages[newMessages.length - 1] = { ...assistantMessage }
-                  return newMessages
-                })
-              } else if (parsed.type === 'tool_call') {
-                // Add tool call
-                assistantMessage.tool_calls.push(parsed)
-                setMessages(prev => {
-                  const newMessages = [...prev]
-                  newMessages[newMessages.length - 1] = { ...assistantMessage }
-                  return newMessages
-                })
-              }
-            } catch (e) {
-              console.error('Error parsing SSE data:', e)
-            }
-          }
-        }
+        // Plain text streaming - just append tokens
+        assistantMessage.content += chunk
+        setMessages(prev => {
+          const newMessages = [...prev]
+          newMessages[newMessages.length - 1] = { ...assistantMessage }
+          return newMessages
+        })
       }
 
       // Refresh plan and notes after message

@@ -10,12 +10,12 @@ const API_BASE_URL = 'http://127.0.0.1:8000'
  * @returns {Promise<Object>} The created thread
  */
 export async function createThread(title = null) {
-  const response = await fetch(`${API_BASE_URL}/threads`, {
+  const response = await fetch(`${API_BASE_URL}/api/v1/conversations`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ title }),
+    body: JSON.stringify({}),
   })
 
   if (!response.ok) {
@@ -30,13 +30,14 @@ export async function createThread(title = null) {
  * @returns {Promise<Array>} List of threads
  */
 export async function getThreads() {
-  const response = await fetch(`${API_BASE_URL}/threads`)
+  const response = await fetch(`${API_BASE_URL}/api/v1/conversations`)
 
   if (!response.ok) {
     throw new Error('Failed to fetch threads')
   }
 
-  return response.json()
+  const data = await response.json()
+  return data.threads || []
 }
 
 /**
@@ -45,7 +46,7 @@ export async function getThreads() {
  * @returns {Promise<Object>} The thread with messages
  */
 export async function getThread(threadId) {
-  const response = await fetch(`${API_BASE_URL}/threads/${threadId}`)
+  const response = await fetch(`${API_BASE_URL}/api/v1/conversations/${threadId}/messages`)
 
   if (!response.ok) {
     throw new Error('Failed to fetch thread')
@@ -61,7 +62,7 @@ export async function getThread(threadId) {
  * @returns {Promise<Object>} The updated thread
  */
 export async function updateThread(threadId, title) {
-  const response = await fetch(`${API_BASE_URL}/threads/${threadId}`, {
+  const response = await fetch(`${API_BASE_URL}/api/v1/conversations/${threadId}`, {
     method: 'PUT',
     headers: {
       'Content-Type': 'application/json',
@@ -82,7 +83,7 @@ export async function updateThread(threadId, title) {
  * @returns {Promise<Object>} Success message
  */
 export async function deleteThread(threadId) {
-  const response = await fetch(`${API_BASE_URL}/threads/${threadId}`, {
+  const response = await fetch(`${API_BASE_URL}/api/v1/conversations/${threadId}`, {
     method: 'DELETE',
   })
 

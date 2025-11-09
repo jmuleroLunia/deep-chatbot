@@ -1,0 +1,11 @@
+{
+  "thread_id": "test-123",
+  "title": "Implement user authentication",
+  "steps": [
+    "Design database schema for users",
+    "Create user registration endpoint",
+    "Implement JWT authentication",
+    "Add password hashing",
+    "Create login endpoint"
+  ]
+}
