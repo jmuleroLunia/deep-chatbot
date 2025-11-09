@@ -1,14 +1,13 @@
 """File system tools for deep agent - enables per-thread persistent storage of notes."""
 from langchain_core.tools import tool
 from langchain_core.runnables import RunnableConfig
-from typing import Optional
 from datetime import datetime, timezone
 from sqlalchemy import select
 from database import SessionLocal
 from models import Note, Thread
 
 
-def _get_thread_id_from_config(config: Optional[RunnableConfig] = None) -> str:
+def _get_thread_id_from_config(config: RunnableConfig) -> str:
     """
     Extract thread_id from the RunnableConfig.
 
@@ -20,12 +19,13 @@ def _get_thread_id_from_config(config: Optional[RunnableConfig] = None) -> str:
     """
     if config and isinstance(config, dict):
         configurable = config.get("configurable", {})
-        return configurable.get("thread_id", "default")
+        if configurable:
+            return configurable.get("thread_id", "default")
     return "default"
 
 
 @tool
-def save_note(title: str, content: str, config: Optional[RunnableConfig] = None) -> str:
+def save_note(title: str, content: str, config: RunnableConfig) -> str:
     """
     Save a note for the current thread for later reference.
     Each thread has its own independent notes.
@@ -33,7 +33,6 @@ def save_note(title: str, content: str, config: Optional[RunnableConfig] = None)
     Args:
         title: The title/identifier for the note
         content: The content of the note
-        config: Configuration object containing thread_id (injected by LangGraph)
 
     Returns:
         Confirmation with the note identifier
@@ -65,13 +64,12 @@ def save_note(title: str, content: str, config: Optional[RunnableConfig] = None)
 
 
 @tool
-def read_note(filename: str, config: Optional[RunnableConfig] = None) -> str:
+def read_note(filename: str, config: RunnableConfig) -> str:
     """
     Read a note from the current thread's workspace.
 
     Args:
         filename: The filename to read (can be partial match)
-        config: Configuration object containing thread_id (injected by LangGraph)
 
     Returns:
         The content of the note
@@ -108,12 +106,9 @@ def read_note(filename: str, config: Optional[RunnableConfig] = None) -> str:
 
 
 @tool
-def list_notes(config: Optional[RunnableConfig] = None) -> str:
+def list_notes(config: RunnableConfig) -> str:
     """
     List all notes for the current thread.
-
-    Args:
-        config: Configuration object containing thread_id (injected by LangGraph)
 
     Returns:
         A list of all note filenames for this thread

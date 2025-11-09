@@ -8,7 +8,7 @@ from database import SessionLocal
 from models import Plan, Thread
 
 
-def _get_thread_id_from_config(config: Optional[RunnableConfig] = None) -> str:
+def _get_thread_id_from_config(config: RunnableConfig) -> str:
     """
     Extract thread_id from the RunnableConfig.
 
@@ -20,19 +20,19 @@ def _get_thread_id_from_config(config: Optional[RunnableConfig] = None) -> str:
     """
     if config and isinstance(config, dict):
         configurable = config.get("configurable", {})
-        return configurable.get("thread_id", "default")
+        if configurable:
+            return configurable.get("thread_id", "default")
     return "default"
 
 
 @tool
-def create_plan(task: str, steps: List[str], config: Optional[RunnableConfig] = None) -> str:
+def create_plan(task: str, steps: List[str], config: RunnableConfig) -> str:
     """
     Create a detailed plan for completing a complex task. Each thread has its own independent plans.
 
     Args:
         task: The main task to accomplish
         steps: List of steps needed to complete the task
-        config: Configuration object containing thread_id (injected by LangGraph)
 
     Returns:
         Confirmation that the plan was created
@@ -71,14 +71,13 @@ def create_plan(task: str, steps: List[str], config: Optional[RunnableConfig] = 
 
 
 @tool
-def update_plan_step(step_number: int, completed: bool = True, config: Optional[RunnableConfig] = None) -> str:
+def update_plan_step(step_number: int, completed: bool, config: RunnableConfig) -> str:
     """
-    Mark a step in the current plan as completed or update its status.
+    Mark a step in the current plan as completed or incomplete.
 
     Args:
         step_number: The step number (1-indexed)
-        completed: Whether the step is completed
-        config: Configuration object containing thread_id (injected by LangGraph)
+        completed: Whether the step is completed (True) or incomplete (False)
 
     Returns:
         Confirmation of the update
@@ -116,15 +115,12 @@ def update_plan_step(step_number: int, completed: bool = True, config: Optional[
 
 
 @tool
-def view_plan(config: Optional[RunnableConfig] = None) -> str:
+def view_plan(config: RunnableConfig) -> str:
     """
     View the current plan and its progress for the current thread.
 
-    Args:
-        config: Configuration object containing thread_id (injected by LangGraph)
-
     Returns:
-        The current plan with completion status
+        The current plan with completion status for each step
     """
     thread_id = _get_thread_id_from_config(config)
 
@@ -150,14 +146,13 @@ def view_plan(config: Optional[RunnableConfig] = None) -> str:
 
 
 @tool
-def add_plan_step(step: str, position: Optional[int] = None, config: Optional[RunnableConfig] = None) -> str:
+def add_plan_step(step: str, position: Optional[int], config: RunnableConfig) -> str:
     """
     Add a new step to the current plan.
 
     Args:
         step: The step description
         position: Optional position to insert (1-indexed), defaults to end
-        config: Configuration object containing thread_id (injected by LangGraph)
 
     Returns:
         Confirmation of the addition
