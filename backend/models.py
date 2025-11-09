@@ -37,12 +37,23 @@ class Thread(Base):
     )
     thread_metadata: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
 
-    # Relationship to messages
+    # Relationships
     messages: Mapped[list["Message"]] = relationship(
         "Message",
         back_populates="thread",
         cascade="all, delete-orphan",
         order_by="Message.timestamp"
+    )
+    plans: Mapped[list["Plan"]] = relationship(
+        "Plan",
+        back_populates="thread",
+        cascade="all, delete-orphan"
+    )
+    notes: Mapped[list["Note"]] = relationship(
+        "Note",
+        back_populates="thread",
+        cascade="all, delete-orphan",
+        order_by="Note.created_at"
     )
 
     def __repr__(self) -> str:
@@ -87,3 +98,91 @@ class Message(Base):
 
     def __repr__(self) -> str:
         return f"<Message(id={self.id}, thread_id='{self.thread_id}', role='{self.role}')>"
+
+
+class Plan(Base):
+    """
+    Plan model representing a task plan for a thread.
+
+    Attributes:
+        id: Unique plan identifier
+        thread_id: Foreign key to parent thread
+        task: Description of the task being planned
+        steps: JSON array of plan steps with status and description
+        status: Overall plan status ('active', 'completed', 'cancelled')
+        created_at: Timestamp when plan was created
+        updated_at: Timestamp when plan was last updated
+        thread: Relationship to parent Thread
+    """
+    __tablename__ = "plans"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    thread_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("threads.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True
+    )
+    task: Mapped[str] = mapped_column(Text, nullable=False)
+    steps: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="active")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=lambda: datetime.now(timezone.utc)
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc)
+    )
+
+    # Relationship to thread
+    thread: Mapped["Thread"] = relationship("Thread", back_populates="plans")
+
+    def __repr__(self) -> str:
+        return f"<Plan(id={self.id}, thread_id='{self.thread_id}', task='{self.task[:50]}...')>"
+
+
+class Note(Base):
+    """
+    Note model representing a saved note for a thread.
+
+    Attributes:
+        id: Unique note identifier
+        thread_id: Foreign key to parent thread
+        filename: Name of the note file
+        content: Note content text
+        created_at: Timestamp when note was created
+        updated_at: Timestamp when note was last updated
+        thread: Relationship to parent Thread
+    """
+    __tablename__ = "notes"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    thread_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("threads.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True
+    )
+    filename: Mapped[str] = mapped_column(String(255), nullable=False)
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=lambda: datetime.now(timezone.utc)
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc)
+    )
+
+    # Relationship to thread
+    thread: Mapped["Thread"] = relationship("Thread", back_populates="notes")
+
+    def __repr__(self) -> str:
+        return f"<Note(id={self.id}, thread_id='{self.thread_id}', filename='{self.filename}')>"

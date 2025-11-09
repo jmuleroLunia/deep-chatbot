@@ -22,7 +22,7 @@ from pathlib import Path
 sys.path.append(str(Path(__file__).parent.parent))
 
 from database import Base
-from models import Thread, Message
+from models import Thread, Message, Plan, Note
 
 target_metadata = Base.metadata
 

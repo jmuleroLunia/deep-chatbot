@@ -16,9 +16,6 @@ from tools.file_tools import (
     save_note,
     read_note,
     list_notes,
-    save_context,
-    load_context,
-    list_context_keys,
 )
 from tools.custom_tools import (
     get_current_time,
@@ -51,19 +48,17 @@ You:
 4. Adapt plan if needed
 
 ### 2. File System & Memory
-Store and retrieve information across conversations:
-- `save_note`: Save important findings, reports, or information
-- `read_note`: Retrieve previously saved notes
-- `list_notes`: See all available notes
-- `save_context`: Store structured context data
-- `load_context`: Retrieve context for ongoing work
-- `list_context_keys`: See all saved contexts
+Store and retrieve information for the current thread:
+- `save_note`: Save important findings, reports, or information for this thread
+- `read_note`: Retrieve previously saved notes from this thread
+- `list_notes`: See all notes saved in this thread
+
+**Important**: Each conversation thread has its own isolated notes. Notes are NOT shared across threads.
 
 **Example workflow:**
 When analyzing data:
 1. Save intermediate results to notes
-2. Store context about the analysis approach
-3. Reference previous findings when needed
+2. Reference previous findings from your notes when needed
 
 ### 3. Specialized Tools
 Execute specific tasks:
@@ -173,9 +168,6 @@ def create_deep_agent(checkpointer=None):
         save_note,
         read_note,
         list_notes,
-        save_context,
-        load_context,
-        list_context_keys,
         # Specialized tools
         get_current_time,
         calculate,

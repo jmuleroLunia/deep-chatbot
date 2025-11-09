@@ -1,139 +1,135 @@
-"""File system tools for deep agent - enables persistent storage of context and notes."""
+"""File system tools for deep agent - enables per-thread persistent storage of notes."""
 from langchain_core.tools import tool
-from pathlib import Path
-from datetime import datetime
-import json
+from langchain_core.runnables import RunnableConfig
+from typing import Optional
+from datetime import datetime, timezone
+from sqlalchemy import select
+from database import SessionLocal
+from models import Note, Thread
 
 
-# Workspace directory for agent files
-WORKSPACE_DIR = Path("workspace")
-WORKSPACE_DIR.mkdir(exist_ok=True)
-
-NOTES_DIR = WORKSPACE_DIR / "notes"
-NOTES_DIR.mkdir(exist_ok=True)
-
-CONTEXT_DIR = WORKSPACE_DIR / "context"
-CONTEXT_DIR.mkdir(exist_ok=True)
-
-
-@tool
-def save_note(title: str, content: str) -> str:
+def _get_thread_id_from_config(config: Optional[RunnableConfig] = None) -> str:
     """
-    Save a note to the workspace for later reference.
+    Extract thread_id from the RunnableConfig.
 
     Args:
-        title: The title/filename for the note
-        content: The content of the note
+        config: The RunnableConfig object passed by LangGraph
 
     Returns:
-        Confirmation with the file path
+        The thread_id string, defaults to "default" if not found
     """
-    # Create a safe filename
-    safe_title = "".join(c if c.isalnum() or c in "-_" else "_" for c in title)
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filename = f"{timestamp}_{safe_title}.txt"
-
-    filepath = NOTES_DIR / filename
-    filepath.write_text(content)
-
-    return f"Note saved to: {filepath}"
+    if config and isinstance(config, dict):
+        configurable = config.get("configurable", {})
+        return configurable.get("thread_id", "default")
+    return "default"
 
 
 @tool
-def read_note(filename: str) -> str:
+def save_note(title: str, content: str, config: Optional[RunnableConfig] = None) -> str:
     """
-    Read a note from the workspace.
+    Save a note for the current thread for later reference.
+    Each thread has its own independent notes.
+
+    Args:
+        title: The title/identifier for the note
+        content: The content of the note
+        config: Configuration object containing thread_id (injected by LangGraph)
+
+    Returns:
+        Confirmation with the note identifier
+    """
+    thread_id = _get_thread_id_from_config(config)
+
+    # Create a safe filename from title
+    safe_title = "".join(c if c.isalnum() or c in "-_" else "_" for c in title)
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    filename = f"{timestamp}_{safe_title}"
+
+    with SessionLocal() as db:
+        # Check if thread exists
+        thread = db.execute(select(Thread).where(Thread.id == thread_id)).scalar_one_or_none()
+        if not thread:
+            return f"Error: Thread '{thread_id}' does not exist. Cannot save note."
+
+        # Create new note
+        note = Note(
+            thread_id=thread_id,
+            filename=filename,
+            content=content
+        )
+
+        db.add(note)
+        db.commit()
+
+    return f"Note '{title}' saved for this thread"
+
+
+@tool
+def read_note(filename: str, config: Optional[RunnableConfig] = None) -> str:
+    """
+    Read a note from the current thread's workspace.
 
     Args:
         filename: The filename to read (can be partial match)
+        config: Configuration object containing thread_id (injected by LangGraph)
 
     Returns:
         The content of the note
     """
-    # Try exact match first
-    filepath = NOTES_DIR / filename
-    if filepath.exists():
-        return filepath.read_text()
+    thread_id = _get_thread_id_from_config(config)
 
-    # Try partial match
-    matches = [f for f in NOTES_DIR.glob(f"*{filename}*")]
+    with SessionLocal() as db:
+        # Try exact match first
+        note = db.execute(
+            select(Note).where(
+                Note.thread_id == thread_id,
+                Note.filename == filename
+            )
+        ).scalar_one_or_none()
 
-    if not matches:
-        return f"No note found matching: {filename}"
+        if note:
+            return note.content
 
-    if len(matches) > 1:
-        return f"Multiple notes found: {', '.join(f.name for f in matches)}"
+        # Try partial match
+        notes = db.execute(
+            select(Note).where(
+                Note.thread_id == thread_id,
+                Note.filename.like(f"%{filename}%")
+            )
+        ).scalars().all()
 
-    return matches[0].read_text()
+        if not notes:
+            return f"No note found matching: {filename} in this thread"
 
+        if len(notes) > 1:
+            return f"Multiple notes found: {', '.join(n.filename for n in notes)}"
 
-@tool
-def list_notes() -> str:
-    """
-    List all notes in the workspace.
-
-    Returns:
-        A list of all note filenames
-    """
-    notes = sorted(NOTES_DIR.glob("*.txt"))
-
-    if not notes:
-        return "No notes found in workspace."
-
-    return "Notes:\n" + "\n".join(f"- {n.name}" for n in notes)
+        return notes[0].content
 
 
 @tool
-def save_context(key: str, data: dict) -> str:
+def list_notes(config: Optional[RunnableConfig] = None) -> str:
     """
-    Save context information for later retrieval.
+    List all notes for the current thread.
 
     Args:
-        key: The key to identify this context
-        data: Dictionary of context data
+        config: Configuration object containing thread_id (injected by LangGraph)
 
     Returns:
-        Confirmation of save
+        A list of all note filenames for this thread
     """
-    safe_key = "".join(c if c.isalnum() or c in "-_" else "_" for c in key)
-    filepath = CONTEXT_DIR / f"{safe_key}.json"
+    thread_id = _get_thread_id_from_config(config)
 
-    filepath.write_text(json.dumps(data, indent=2))
+    with SessionLocal() as db:
+        notes = db.execute(
+            select(Note).where(Note.thread_id == thread_id).order_by(Note.created_at)
+        ).scalars().all()
 
-    return f"Context saved with key: {key}"
+        if not notes:
+            return "No notes found for this thread."
 
-
-@tool
-def load_context(key: str) -> str:
-    """
-    Load previously saved context information.
-
-    Args:
-        key: The key to identify the context
-
-    Returns:
-        The context data as a JSON string
-    """
-    safe_key = "".join(c if c.isalnum() or c in "-_" else "_" for c in key)
-    filepath = CONTEXT_DIR / f"{safe_key}.json"
-
-    if not filepath.exists():
-        return f"No context found for key: {key}"
-
-    return filepath.read_text()
+        return "Notes:\n" + "\n".join(f"- {n.filename}" for n in notes)
 
 
-@tool
-def list_context_keys() -> str:
-    """
-    List all saved context keys.
-
-    Returns:
-        A list of all context keys
-    """
-    contexts = sorted(CONTEXT_DIR.glob("*.json"))
-
-    if not contexts:
-        return "No saved contexts found."
-
-    return "Saved contexts:\n" + "\n".join(f"- {c.stem}" for c in contexts)
+# Context tools removed since they weren't explicitly required in the per-thread plan
+# If needed later, they can be implemented similar to notes

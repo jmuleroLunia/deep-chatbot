@@ -2,11 +2,13 @@
 Database configuration and session management for SQLite.
 """
 from typing import AsyncGenerator
+from sqlalchemy import create_engine
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
-from sqlalchemy.orm import DeclarativeBase
+from sqlalchemy.orm import DeclarativeBase, sessionmaker, Session
 
 # Database URL - using aiosqlite for async support
 DATABASE_URL = "sqlite+aiosqlite:///./workspace/threads.db"
+SYNC_DATABASE_URL = "sqlite:///./workspace/threads.db"
 
 # Create async engine
 engine = create_async_engine(
@@ -15,10 +17,26 @@ engine = create_async_engine(
     future=True,
 )
 
+# Create sync engine for tools (since LangGraph tools are synchronous)
+sync_engine = create_engine(
+    SYNC_DATABASE_URL,
+    echo=False,
+    future=True,
+)
+
 # Create async session factory
 async_session_factory = async_sessionmaker(
     engine,
     class_=AsyncSession,
+    expire_on_commit=False,
+    autoflush=False,
+    autocommit=False,
+)
+
+# Create sync session factory for tools
+SessionLocal = sessionmaker(
+    sync_engine,
+    class_=Session,
     expire_on_commit=False,
     autoflush=False,
     autocommit=False,

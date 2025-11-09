@@ -28,8 +28,20 @@ function ChatInterface({ threadId, shouldLoadMessages, onMessagesLoaded }) {
     if (threadId) {
       setMessages([])
       loadThreadMessages()
+      // Also reload plan and notes for the new thread
+      if (showPlan) fetchPlan()
+      if (showNotes) fetchNotes()
     }
   }, [threadId])
+
+  // Load plan and notes when panels are opened
+  useEffect(() => {
+    if (showPlan) fetchPlan()
+  }, [showPlan, threadId])
+
+  useEffect(() => {
+    if (showNotes) fetchNotes()
+  }, [showNotes, threadId])
 
   // Load thread messages from backend
   const loadThreadMessages = async () => {
@@ -54,8 +66,14 @@ function ChatInterface({ threadId, shouldLoadMessages, onMessagesLoaded }) {
 
   // Fetch plan
   const fetchPlan = async () => {
+    if (!threadId) {
+      setPlan(null)
+      return
+    }
     try {
-      const response = await axios.get(`${API_BASE_URL}/plan`)
+      const response = await axios.get(`${API_BASE_URL}/plan`, {
+        params: { thread_id: threadId }
+      })
       setPlan(response.data)
     } catch (error) {
       console.error('Error fetching plan:', error)
@@ -65,8 +83,14 @@ function ChatInterface({ threadId, shouldLoadMessages, onMessagesLoaded }) {
 
   // Fetch notes
   const fetchNotes = async () => {
+    if (!threadId) {
+      setNotes([])
+      return
+    }
     try {
-      const response = await axios.get(`${API_BASE_URL}/notes`)
+      const response = await axios.get(`${API_BASE_URL}/notes`, {
+        params: { thread_id: threadId }
+      })
       setNotes(response.data.notes || [])
     } catch (error) {
       console.error('Error fetching notes:', error)

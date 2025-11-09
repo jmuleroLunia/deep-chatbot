@@ -13,7 +13,7 @@ from sqlalchemy.orm import selectinload
 
 from agents.deep_agent import create_deep_agent, get_checkpointer
 from database import init_db, close_db, get_db, async_session_factory
-from models import Thread, Message
+from models import Thread, Message, Plan, Note
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -254,67 +254,126 @@ async def chat_stream(request: ChatRequest):
 
 
 @app.get("/plan", response_model=PlanResponse)
-async def get_plan():
+async def get_plan(thread_id: Optional[str] = None, db: AsyncSession = Depends(get_db)):
     """
-    Get the current plan from the workspace.
+    Get the active plan for a specific thread.
+
+    Args:
+        thread_id: Optional thread ID. If not provided, returns empty plan.
 
     Returns the active plan with all steps and their completion status.
     """
-    if not PLAN_FILE.exists():
+    if not thread_id:
         return PlanResponse()
 
     try:
-        plan_data = json.loads(PLAN_FILE.read_text())
-        return PlanResponse(**plan_data)
+        # Query for active plan for this thread
+        plan = await db.execute(
+            select(Plan).where(
+                Plan.thread_id == thread_id,
+                Plan.status == "active"
+            )
+        )
+        plan = plan.scalar_one_or_none()
+
+        if not plan:
+            return PlanResponse()
+
+        return PlanResponse(
+            task=plan.task,
+            steps=plan.steps,
+            status=plan.status
+        )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error reading plan: {str(e)}")
 
 
 @app.get("/notes")
-async def list_notes():
+async def list_notes(thread_id: Optional[str] = None, db: AsyncSession = Depends(get_db)):
     """
-    List all notes saved in the workspace.
+    List all notes saved for a specific thread.
+
+    Args:
+        thread_id: Optional thread ID. If not provided, returns empty list.
 
     Returns a list of note filenames.
     """
-    if not NOTES_DIR.exists():
+    if not thread_id:
         return {"notes": []}
 
-    notes = sorted(NOTES_DIR.glob("*.txt"))
-    return {"notes": [n.name for n in notes]}
+    try:
+        # Query notes for this thread
+        result = await db.execute(
+            select(Note).where(Note.thread_id == thread_id).order_by(Note.created_at)
+        )
+        notes = result.scalars().all()
+
+        return {"notes": [n.filename for n in notes]}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error listing notes: {str(e)}")
 
 
 @app.get("/notes/{filename}")
-async def read_note(filename: str):
+async def read_note(filename: str, thread_id: Optional[str] = None, db: AsyncSession = Depends(get_db)):
     """
-    Read the content of a specific note.
+    Read the content of a specific note from a thread.
 
     Args:
         filename: The name of the note file to read
+        thread_id: Optional thread ID. If not provided, returns 404.
     """
-    filepath = NOTES_DIR / filename
-
-    if not filepath.exists():
-        raise HTTPException(status_code=404, detail=f"Note not found: {filename}")
+    if not thread_id:
+        raise HTTPException(status_code=400, detail="thread_id parameter is required")
 
     try:
-        content = filepath.read_text()
-        return {"filename": filename, "content": content}
+        # Query for note in this thread
+        result = await db.execute(
+            select(Note).where(
+                Note.thread_id == thread_id,
+                Note.filename == filename
+            )
+        )
+        note = result.scalar_one_or_none()
+
+        if not note:
+            raise HTTPException(status_code=404, detail=f"Note not found: {filename}")
+
+        return {"filename": note.filename, "content": note.content}
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error reading note: {str(e)}")
 
 
 @app.delete("/plan")
-async def clear_plan():
+async def clear_plan(thread_id: Optional[str] = None, db: AsyncSession = Depends(get_db)):
     """
-    Clear the current plan.
+    Clear the active plan for a specific thread.
+
+    Args:
+        thread_id: Optional thread ID. If not provided, returns 400.
 
     Useful for starting fresh with a new task.
     """
-    if PLAN_FILE.exists():
-        PLAN_FILE.unlink()
-        return {"message": "Plan cleared successfully"}
-    return {"message": "No plan to clear"}
+    if not thread_id:
+        raise HTTPException(status_code=400, detail="thread_id parameter is required")
+
+    try:
+        # Delete active plan for this thread
+        result = await db.execute(
+            delete(Plan).where(
+                Plan.thread_id == thread_id,
+                Plan.status == "active"
+            )
+        )
+        await db.commit()
+
+        if result.rowcount > 0:
+            return {"message": "Plan cleared successfully"}
+        return {"message": "No plan to clear"}
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=500, detail=f"Error clearing plan: {str(e)}")
 
 
 # ============================================================================
